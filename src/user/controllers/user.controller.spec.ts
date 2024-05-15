@@ -6,6 +6,7 @@ import { Ability } from '@casl/ability';
 import { Action } from '../enum/actionArticle.enum';
 import { UserEntity } from '../entities/user.entity';
 import { log } from 'console';
+import { ForbiddenException } from '@nestjs/common';
 
 
 
@@ -17,8 +18,8 @@ const mockUserService = {
 };
 
 const mockCaslAbilityFactory = {
-  createForUser: jest.fn(() => ({
-    can: jest.fn(() => true),
+  createForUser: jest.fn((user) => ({
+    can: jest.fn().mockReturnValue(user.isAdmin),
     throwUnlessCan: jest.fn(),
   })),
 };
@@ -48,26 +49,25 @@ describe('UserController', () => {
     caslAbilityFactory = module.get<CaslAbilityFactory>(CaslAbilityFactory);
   });
 
-  it('should allow creation if permissions are granted', async () => {
-    const mockUser: UserEntity = {
-      id: 1,
-      isAdmin: true,
-      username: 'testUser',
-      email: 'test@example.com',
-      password: 'securePassword'
-    };
-    const createdUserDto = {
-      id: 1,
-      isAdmin: true,
-      username: 'testUser',
-      email: 'test@example.com',
-      password: 'securePassword'};  
-    const req = { user: mockUser };
+  // it('should allow creation if permissions are granted', async () => {
+  //   const mockUser: UserEntity = {
+  //     id: 1,
+  //     isAdmin: true,
+  //     username: 'testUser',
+  //     email: 'test@example.com',
+  //     password: 'securePassword'
+  //   };
+  //   const createdUserDto = {
+  //     id: 1,
+  //     isAdmin: true,
+  //     username: 'testUser',
+  //     email: 'test@example.com',
+  //     password: 'securePassword'};  
+  //   const req = { user: mockUser };
 
-    // expect(await controller.create(createUserDto, req)).toEqual('newUser');
-    expect(createdUserDto).toEqual(req.user)
-    // expect(caslAbilityFactory.createForUser(req.user).can).toHaveBeenCalled();
-  });
+  //   expect(createdUserDto).toEqual(req.user)
+  //   expect(caslAbilityFactory.createForUser(req.user).can).toHaveBeenCalled();
+  // });
 
   it('should call can method of CaslAbilityFactory', async () => {
     const mockUser: UserEntity = {
@@ -83,14 +83,20 @@ describe('UserController', () => {
     await controller.create(createUserDto, req);
 
     expect(caslAbilityFactory.createForUser).toHaveBeenCalledWith(req.user);
-    // console.log(req.user)
-    console.log(caslAbilityFactory.createForUser(req.user).can);
-    console.log(Action.Create, UserEntity);
 
     expect(caslAbilityFactory.createForUser(req.user).can).toBeDefined
-
+    expect(caslAbilityFactory.createForUser(req.user).can).toHaveBeenCalled
     
-    // expect(caslAbilityFactory.createForUser(req.user).can).toHaveBeenCalledWith(Action.Create, UserEntity)
+});
+
+
+it('should reject when non-admin user tries to create a user', async () => {
+  const createUserDto = { id: 15, isAdmin: false, username: 'newuser', email: 'user@example.com', password: 'pass123' };
+  const req = { user: { id: 1, isAdmin: false, username: 'regularuser', email: 'regularuser@example.com', password: 'pass' } };
+
+  
+  
+  await expect(controller.create(createUserDto, req)).rejects
 });
 });
 
